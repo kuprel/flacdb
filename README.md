@@ -4,7 +4,7 @@ Compress Physionet dat files to flac, achieves ~2.7x compression
 ### Install Requirements
 
 ```
-pip3 install numpy wfdb soundfile
+pip install numpy wfdb soundfile
 ```
 
 ### Example Usage
