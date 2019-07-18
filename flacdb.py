@@ -2,10 +2,11 @@ import wfdb
 import soundfile
 import numpy
 
-def to_digital(rec):
-    data = rec.p_signal.copy()
-    data *= rec.adc_gain
-    data += rec.baseline
+max_block_size = 2**21
+
+def to_digital(data, hdr):
+    data *= hdr.adc_gain
+    data += hdr.baseline
     data[numpy.isnan(data)] = -2**15
     data = numpy.around(data).astype('int16')
     return data
@@ -17,25 +18,30 @@ def to_physical(data, hdr):
     data /= hdr.adc_gain
     return data
 
-def read_record(path, blocksize=2**20):
-    rec = wfdb.rdheader(path)
-    data = numpy.zeros((rec.sig_len, rec.n_sig), dtype='int16')
+def write_record(rec, path):
+    data = to_digital(rec.p_signal.copy(), rec)
+    soundfile.write(path + '.flac', data, 125, format='FLAC')
 
-    with open(path + '.flac', 'rb') as f:
+def _read_blocks(hdr, path):
+    data = numpy.empty((hdr.sig_len, hdr.n_sig), dtype='int16')
 
-        sf = soundfile.SoundFile(f)
+    with soundfile.SoundFile(path + '.flac') as sf:
 
-        blocks = sf.blocks(dtype='int16', blocksize=blocksize)
+        blocks = sf.blocks(blocksize=max_block_size, dtype='int16', always_2d=True)
 
         for i, block in enumerate(blocks):
-            if rec.n_sig == 1: block = numpy.expand_dims(block, axis=1)
-            data[i*blocksize:(i+1)*blocksize] = block
+            data[i*max_block_size:(i+1)*max_block_size] = block
 
-        rec.p_signal = to_physical(data, rec)
+    return data
 
-    return rec
+def read_record(path):
+    hdr = wfdb.rdheader(path)
 
-def write_record(rec, path):
-    data = to_digital(rec)
-    with open(path + '.flac', 'wb') as f:
-        soundfile.write(f, data, 125, format='FLAC')
+    if hdr.sig_len < max_block_size:
+        data, rate = soundfile.read(path + '.flac', dtype='int16', always_2d=True)
+    else:
+        data = _read_blocks(hdr, path)
+
+    hdr.p_signal = to_physical(data, hdr)
+
+    return hdr
