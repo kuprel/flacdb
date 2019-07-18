@@ -1,5 +1,5 @@
 # flacdb
-Compress Physionet dat files to flac, achieves ~2.5x compression
+Compress Physionet dat files to flac, achieves ~2.7x compression
 
 ### Install Requirements
 
